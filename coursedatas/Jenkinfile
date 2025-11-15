@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "coursedatas:latest"
+        // Jenkins Credential ID for kubeconfig file
+        KUBEFILE = credentials('kubeconfig')  
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                sh "mvn clean package -DskipTests"
+            }
+        }
+
+        stage('Enable Minikube Docker Engine') {
+            steps {
+                script {
+                    // RUNNING MINIKUBE DOCKER ENV IN POWERSHELL
+                    bat """
+                        for /f "tokens=* usebackq" %%x in (`minikube -p minikube docker-env`) do %%x
+                    """
+                }
+            }
+        }
+
+        stage('Build Docker Image INSIDE Minikube') {
+            steps {
+                bat """
+                    @echo ON
+                    call minikube -p minikube docker-env >> docker_env.bat
+                    call docker_env.bat
+                    docker build -t ${IMAGE_NAME} .
+                """
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                writeFile file: 'kubeconfig', text: KUBEFILE
+                bat """
+                    set KUBECONFIG=kubeconfig
+                    kubectl set image deployment/coursedatas coursedatas=${IMAGE_NAME}
+                    kubectl rollout restart deployment/coursedatas
+                    kubectl rollout status deployment/coursedatas
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🚀 Deployment Successful!"
+        }
+        failure {
+            echo "❌ Deployment Failed. Check logs."
+        }
+    }
+}

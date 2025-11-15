@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coursedatas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coursedatas
+  template:
+    metadata:
+      labels:
+        app: coursedatas
+    spec:
+      containers:
+        - name: coursedatas
+          image: coursedatas:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coursedatas
+spec:
+  type: NodePort
+  selector:
+    app: coursedatas
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
